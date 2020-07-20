@@ -1,0 +1,192 @@
+---
+title: "Laboratorio 3: Clustering en R"
+author: "Bárbara Poblete, Felipe Bravo,  Cinthia Sánchez, Alison Fernández, Juan Pablo Silva, Aymé Arango"
+date: "Junio 2020"
+output: 
+  html_document: 
+    theme: cosmo
+    toc: yes
+---
+
+# Declaración de compromiso ético
+Yo Pía Contreras Guerrero, declaro que realicé de manera individual todos y cada uno de los pasos de la presente actividad. También declaro no incurrir en copia, ni compartir mis respuestas con otras personas. Por lo que, ratifico que las respuestas son de mi propia confección y reflejan mi propio conocimiento.
+
+# Instrucciones
+
+1. Trabaje en equipos de dos personas o individualmente.
+
+2. Modifique este archivo `.Rmd` agregando sus respuestas donde corresponda.
+
+3. Para cada pregunta, cuando corresponda, **incluya el código fuente que utilizó para llegar a su respuesta**.
+
+4. Al final de la clase, **genere un archivo HTML usando RStudio** y súbalo a U-Cursos.
+   Basta con que uno de los integrantes haga la entrega. Si ambos hacen una entrega en U-Cursos, se revisará cualquiera de éstas.
+
+# Laboratorio
+
+Para este laboratorio usaremos el dataset de cantidad de denuncias por 100 mil habitantes por tipo de delito desde el año 2001 al 2016 en Chile (Fuente: http://www.seguridadpublica.gov.cl/estadisticas/tasa-de-denuncias-y-detenciones/delitos-de-mayor-connotacion-social-series-de-datos-2001-2017/). 
+
+Cargue el siguiente dataset:
+```{r}
+data <- read.table('https://users.dcc.uchile.cl/~hsarmien/mineria/datasets/denuncias-2001-2016.txt', row.name = 1, header = T)
+```
+
+Utilizaremos sólo los datos del 2006. Ejecute las siguientes líneas de código para filtrar los datos:
+
+```{r, eval=T, results=F}
+anio <- 2006
+x <- data[data$anio == anio, ]
+rownames(x) <- x$comuna
+x <- x[, c(-1, -2)]
+head(x)
+```
+
+## Parte 1: K-means
+
+**1.1.** Teniendo en cuenta estos datos, utilice el método del codo para elegir dos números de clusters para `k-means`, y explique porqué eligió esos `k`.
+
+```{r}
+set.seed(2)
+wss <- 0
+clust = 15 
+for (i in 1:clust){
+  wss[i] <-
+    sum(kmeans(x, centers=i)$withinss)
+}
+
+plot(1:clust, wss, type="b", xlab="Numero de clusters", ylab="wss")
+```
+
+
+**Respuesta 1.1**
+Se eligió como número de cluster el valor k=2 ya que en éste valor se puede ver cómo en la curva se distingue un codo, por lo tanto, para valores mayores que éste se podrían agrupar valores que no necesariamente sean del mismo cluster, y para valores menores que éste, se podría tener muchos cluster de valores que en realidad sean del mismo cluster.
+
+# **1.2.** 
+Explique cómo realizaría la validación de clusters generados por k-means utilizando el *enfoque visual* visto en clases. ¿Cuándo se considera que un clustering es "bueno" y por qué?
+
+**Respuesta 1.2**
+
+
+Según enfoque visual, ordeno la matriz de similitud de acuerdo a las etiquetas, si la similitud es alta quedan bloques en la diagonal y con colores cálidos (del mismo tamaño), si no es así, se alejan de la diagonal y sus colores son tonos fríos (azules). Para DBSCAN no sirve mucho pues el centro muchas veces no está cerca.
+
+Un clustering bueno es si en la diagonal hay cuadrados color rojo (y en general es de colores cálidos).
+
+**1.3.** Al ejecutar el siguiente código varias veces, obtenemos resultados diferentes. ¿Cómo podría evitar los resultados variables de `K-means`?
+
+```{r eval=F}
+km.out <- kmeans(x, 3, nstart = 5)
+km.out$centers
+```
+
+
+**Respuesta 1.3**
+Una de las posibles soluciones el variar la semilla aleatoria y buscar el modelo con que se obtenga menor valor de SSE con varias ejecuciones de K-means, otra forma de hacerlo es fijar los centroides con el parámetro centers. Sin embargo estos métodos no garantizan que se encuentren los clusters óptimos, se puede utilizar una variante de k-means como lo es bisecting k-means.
+
+**1.4.** ¿Cómo podría encontrar *outliers* en los datos usando `K-means`? Describa su propuesta. No es necesario implementar la solución
+
+```{r eval=F}
+centers <- km.out$centers
+distances <- sqrt(rowSums((x - centers)^2))
+
+outliers <- order(distances, decreasing=T)[1:5]
+print(outliers) 
+print(x[outliers,])
+```
+
+
+**Respuesta 1.4**
+Se podría calcular la distancia a los centroides, donde los datos que obtenga la mayor distancia a los centroides, entonces son outliers.
+
+## Parte 2: Clustering Jerárquico Aglomerativo
+
+**2.1** Usando el dataframe `x`, ejecute cada uno de los 3 métodos de clustering jerárquico: `complete`, `single` y `average`, y visualice los dendrogramas formados. Adjunte código necesario.
+
+```{r}
+xec <- scale(x)
+
+
+dist.matrix <- dist(x)
+
+hc.complete <- hclust(dist.matrix, method = "complete")
+hc.single <- hclust(dist.matrix, method = "single")
+hc.average <- hclust(dist.matrix, method = "average")
+
+
+plot(hc.complete, main="Complete", xlab="", ylab="", cex=0.1, labels=FALSE)
+plot(hc.single, main="Single", xlab="", ylab="", cex=0.1, labels=FALSE)
+plot(hc.average, main="Average", xlab="", ylab="", cex=0.1, labels=FALSE)
+```
+
+
+
+**2.2** De los clústers obtenidos con el método `complete` de la pregunta anterior, liste la asignación de cada observación a un cluster para el número de clústers es 3:
+
+```{r }
+cutree(hc.complete, k = 3) 
+```
+
+**2.3.** ¿Cómo sería posible encontrar *outliers* en los datos usando clustering jerárquico? Basta con que comente su respuesta.
+
+**Respuesta 2.3**
+Los outliers, en general son los grupos más pequeños que más tardan en unirse, ésto se obtiene recorriendo el árbol desde las hojas hasta la raíz.
+
+
+**2.4.** Describa una ventaja y una desventaja de emplear cada uno de los métodos de clustering vistos en este laboratorio (k-means y jerárquico aglomerativo).
+
+**Respuesta 2.4**
+K-means: como ventaja puede destacar que se pueden definir los centroides iniciales,sobre todo es una ventaja cuando se sabe cuáles son, lo cuala lleva a tener soluciones muy buenas. Como desventaja destaca que si al elegir un mal centroide, entonces el algoritmo no se comporta bien, ya que dependiendo de la elección de centroides, se conforman los clusters, donde si el centroide no es correcto, entonces los datos obtenidos en los clusters no son tan buenos.
+
+Algoritmo jerárquico: como ventaja destaca que se puede establecer una estructura entre grupos, dividiéndolos en subgrupos, pero como desventaja es que para un mismo set de datos, siempre se obtendrán los mismos grupos.
+
+## Parte 3: Dbscan
+Para esta parte del Laboratorio necesitaremos librerías adicionales, además estaremos usando otro dataset. Ejecute las siguientes líneas para incluir las librerías y descargar los datos.
+
+```{r}
+library("dbscan")  
+library("ggplot2")
+```
+
+```{r}
+df <- read.table("http://users.dcc.uchile.cl/~hsarmien/mineria/datasets/d31.txt")
+head(df)
+```
+
+**3.1.** Ejecute DBSCAN usando los parámetros `eps=0.9`y `minPts=5`.
+
+```{r}
+db1 <- dbscan::dbscan(df, eps = 0.9, minPts = 5)
+```
+
+**3.3.** Una forma de encontrar clusters más claros, es estimar el valor `eps` usando el método de la rodilla (basado en KNN). La idea de este procedimiento es calcular la distancia promedio de cada punto a sus `k` vecinos más cercanos los cuales son graficados en orden ascendente. El objetivo es determinar la _rodilla_, que corresponde al valor óptimo de `eps`. Pruebe varios valores de `h` utilizando el siguiente código y adjunte el gráfico para el mejor `h` que usted considere. 
+
+```{r}
+dbscan::kNNdistplot(df, k=3)   # k vecinos
+abline(h=0.7, lty=2, col="red")  # ajuste h
+```
+
+
+
+**Respuesta 3.3**
+
+Se eligió el valor 0.7 puesto es la distancia 3-NN donde se identifica el codo de mejor manera.
+
+**3.4** Ejecute y grafique los clusters usando el método DBSCAN haciendo uso de parámetro `eps` (`h`) encontrado previamente.
+```{r}
+db2 <- dbscan::dbscan(df, eps=0.7, minPts=5)
+db2
+df2 <- df
+df2$cluster <- factor(db2$cluster)
+ggplot(df2, aes(x=V1, y=V2, colour=cluster)) + geom_point()
+
+```
+
+**3.5**
+Además de la visual, que otras formas de validación de clusters conoce. 
+
+**Respuesta 3.5**
+
+La validación de clusters utilizando en enfoque visual se puede hacer a través de la matriz de similitud o a través de la matriz de distancia.
+
+Para la matriz de proximidad se hace comparación de similitud entre filas y columnas, la distancia puede ser de Minkowski, Manhattan, Jacard o coseno.
+
+Comparamos dos matrices, 1) Matriz de incidencia: una fila y una columna por cada punto, se le asigna un 1 si los dos puntos coinciden en el mismo cluster, y se asigna 0 si los dos puntos no coinciden en el mismo cluster. 2) Matriz de proximidad (nxn usando distancias): usamos correlación entre matrices, alta correlación indica que puntos en el mismo cluster están cercanas, comparar correlación.

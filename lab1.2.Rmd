@@ -1,0 +1,174 @@
+---
+title: 'Laboratorio 1.2: Exploración y Visualización de Datos'
+author: "Pía Contreras"
+date: "Marzo 2020"
+output: 
+  html_document: 
+    theme: default
+    toc: yes
+---
+
+# Declaración de compromiso ético
+Yo Pía Contreras, declaro que realice de manera individual todos y cada uno de los pasos de la presente actividad. También declaro no incurrir en copia, ni compartir mis respuestas de manera escrita con otras personas. Por lo que, rectifico que las respuestas son de mi propia confección y reflejan mi propio conocimiento.
+
+# Instrucciones
+
+1. Trabaje de manera individual.
+
+2. Modifique este archivo `.Rmd` agregando sus respuestas donde corresponda. En caso de código, cree un nuevo bloque de sentencias (chunk) para adjuntar su respuesta. Si necesita alguna explicación o fundamento, adjúntelo como texto plano.
+
+3. Para cada pregunta, cuando corresponda, **incluya el código fuente que utilizó para llegar a su respuesta**.
+
+4. Cuando finalice el laboratorio, **genere un archivo HTML usando RStudio** y súbalo a U-Cursos.
+
+5. En caso de dudas, recurra al grupo de telegram: https://t.me/joinchat/ECxbIRpIjvvZI-f9Rfu3Aw.
+
+# Laboratorio
+
+En esta sesión trabajaremos con los datos del Proceso Constituyente 2016-2017 publicados en el Portal de Datos Abiertos del Gobierno de Chile, para mayor información pueden ingresar al siguiente link: https://datos.gob.cl/dataset/proceso-constituyente-abierto-a-la-ciudadania. Los datos corresponden a las actas de los Encuentros Locales Autoconvocados (ELAs), en cada cual, un grupo de personas se reune a discutir distintos conceptos como por ejemplo: salud, educación, seguridad, etc.
+
+Los datos con que trabajaremos consisten en la cantidad de veces que cada concepto constitucional fue mencionado por cada localidad de Chile. 
+
+Para cargar los datos, use:
+
+```{r}
+data_tf <- read.csv("http://dcc.uchile.cl/~hsarmien/mineria/datasets/actas.txt", header = T)
+```
+
+
+**Por cada pregunta adjunte el código R que utilizó para llegar a la respuesta. Respuestas sin código no serán evaluadas**
+
+## 1. Exploración básica
+
+1. ¿Cuáles son las dimensiones del dataset (filas, columnas)? Adjunte código o indique cómo determinó la cantidad de datos total. 
+
+Tiene 328 filas y 113 columnas
+
+```{r}
+# RESPUESTA
+dim(data_tf)
+```
+
+2. ¿Qué describe cada línea del dataset? (ejemplifique tomando el dato de la fila 100)
+
+Describe la cantidad de repeticion de cada palabra en el proceso de la  localidad de la araucania/cautin/freire
+```{r}
+data_tf[100,]
+```
+
+
+3. ¿Existen localidades repetidas en el dataset? Adjunte el código o indique cómo llegó a esa conclusión. 
+
+No existen localidades repetidas puesto que al aplicar la funcion unique aparecieron 328 localidades diferentes que es el mismo numero de filas
+```{r}
+unique(data_tf$localidad)
+```
+
+
+4. Liste los nombres de las columnas del dataset `data_tf`. Adjunte código en R y recuerde que si el resultado es muy largo use `head`. Escriba una descripción general de lo que representa cada columna del dataset.
+```{r}
+nombres_columnas<-names(data_tf)
+head(nombres_columnas)
+```
+
+## 2. Análisis
+
+1. Liste todas las localidades donde *no* se discutió el concepto `a_la_educacion`. 
+```{r}
+df2<-with(data_tf, data_tf[a_la_educacion == 0, ])
+unique(df2$localidad)
+```
+
+2. Liste las 10 localidades que más mencionaron el concepto `justicia`. 
+```{r}
+justicia<-with(data_tf, data_tf[justicia >= 70, ])
+unique(justicia$localidad)
+```
+
+
+3. Liste las 10 localidades que menos participaron en el proceso. Describa cómo definió su medida de participación.
+definí la participacion como el que menos aportó palabras al proceso constituyente.
+```{r}
+library(dplyr)
+data_tf$palabras_total=rowSums(data_tf[,2:113])
+participacion <- select(data_tf, localidad, palabras_total)
+participacion_menor<-with(participacion,participacion[palabras_total<=20,])
+participacion_menor
+```
+
+4. Liste los 10 conceptos más mencionados a lo largo de todo el proceso.
+```{r}
+library(dplyr)
+cantidad<-colSums(data_tf[,2:113])
+tail(sort(cantidad),10)
+
+```
+
+
+5. Ejecute el siguiente código que permitirá agregar una nueva columna a nuestro dataframe que solo tendrá el nombre de la región.
+```{r, message = F, warning=F}
+library(dplyr)
+regiones <- strsplit(as.character(data_tf[,1]), '/')
+data_tf$region <- sapply(regiones, "[[", 1)
+data_tf <- data_tf %>% select(localidad, region, everything())
+```
+
+Luego, mediante un gráficos de barras (ggplot), muestre los top 10 conceptos más mencionados en cada una de las siguientes regiones (adjunte gráficos y código):
+
+```{r}
+library(ggplot2)
+antofagasta=filter(data_tf, region=="Antofagasta")
+palabras_antofagasta<-colSums(antofagasta[,3:114])
+palabras_antofagasta_orden<-tail(sort(palabras_antofagasta),10)
+palabras_antofagasta_orden=data.frame(palabras_antofagasta_orden)
+palabras_antofagasta_orden
+df_antofagasta<-data.frame("palabra"= c("igualdad", "descentralizacion","a la eduacion","cumplimiento de leyes y normal", "plebiscitos,referendos y consultas","justicia", "a la salud","respeto por la constitucion","deberes_de_proteccion_de_conservacion_de_la_naturaleza","proteccion._promocion_y_respeto_de_los_derechos_humanos_y_fundamentales"), "cantidad"=c(101,111,112,117,119,121,124,132,135,140))
+ggplot(df_antofagasta) +   # asociamos un data frame a ggplot
+  geom_bar(aes(x=palabra, y = cantidad), stat="identity") +   # creamos un grafico de barras como una capa
+  coord_flip() +  # transformamos el grafico invirtiendo los ejes de coordenadas (sólo visualmente)
+  ggtitle("Palabras más mencionadas Antofagasta") + # título
+  xlab("Palabra") + ylab("Frecuencia (cantidad)")  # etiquetas
+  
+```
+```{r}
+library(ggplot2)
+los_lagos=filter(data_tf, region=="Los Lagos")
+palabras_los_lagos<-colSums(los_lagos[,3:114])
+palabras_los_lagos_orden<-tail(sort(palabras_los_lagos),10)
+palabras_los_lagos_orden=data.frame(palabras_los_lagos_orden)
+palabras_los_lagos_orden
+
+df_los_lagos<-data.frame("palabra"= c("respeto de derechos de otros", "de proteccion y conservacion de patrimonio historico y cultural","igualdad", "cumplimiento de leyes y normas", "plebiscitos,referendos y consultas","a la salud","a_la_educacion","respeto por la constitucion","proteccion, promocion y respetos de los derechos humanos y fundamentales","deberes de proteccion de conservacion de la naturaleza"), "cantidad"=c(199,207,210,214,214,224,226,236,253,267))
+ggplot(df_los_lagos) +   # asociamos un data frame a ggplot
+  geom_bar(aes(x=palabra, y = cantidad), stat="identity") +   # creamos un grafico de barras como una capa
+  coord_flip() +  # transformamos el grafico invirtiendo los ejes de coordenadas (sólo visualmente)
+  ggtitle("Palabras más mencionadas Los Lagos") + # título
+  xlab("Palabra") + ylab("Frecuencia (cantidad)")  # etiquetas
+```
+```{r}
+library(ggplot2)
+metropolitana=filter(data_tf, region=="Metropolitana de Santiago")
+palabras_metropolitana<-colSums(metropolitana[,3:114])
+palabras_metropolitana_orden<-tail(sort(palabras_metropolitana),10)
+palabras_metropolitana_orden=data.frame(palabras_metropolitana_orden)
+palabras_metropolitana_orden
+
+df_metropolitana<-data.frame("palabra"= c("democracia", "respeto de derechos de otros","respeto por la constitucion", "de proteccion y conservacion de patrimonio historico y cultural", "igualdad","a la educacion","plebiscito, referendos y consultas","a_la_salud","deberes_de_proteccion_de_conservacion_de_la_naturaleza","proteccion._promocion_y_respeto_de_los_derechos_humanos_y_fundamentales"), "cantidad"=c(2021,2207,2256,2301,2576,2649,2654,2670,2843,3102))
+ggplot(df_los_lagos) +   # asociamos un data frame a ggplot
+  geom_bar(aes(x=palabra, y = cantidad), stat="identity") +   # creamos un grafico de barras como una capa
+  coord_flip() +  # transformamos el grafico invirtiendo los ejes de coordenadas (sólo visualmente)
+  ggtitle("Palabras más mencionadas Metropolitana") + # título
+  xlab("Palabra") + ylab("Frecuencia (cantidad)")  # etiquetas
+```
+- `Antofagasta`
+- `Los Lagos`
+- `Metropolitana de Santiago`
+
+6. De la pregunta anterior, ¿considera que es razonable usar el conteo de frecuencias para determinar las regiones que tuvieron mayor participación en el proceso? ¿Por qué? Sugiera y solamente comente una forma distinta de hacerlo.
+
+En cierta parte sí, es un buen argumento para saber qué comuna participó más, sin embargo, no sabemos cuantas personas participaron en el proceso y cuantas ideas dieron, que es lo que realmente importa.
+
+7. Qué preprocesamiento adicional considera que deberíamos realizar para poder trabajar con estos datos?
+
+Calcular la población por cada 10.000 habitantes y así poder comparar en base a porcentajes la participacion de cada region en el proceso
+
